@@ -1,90 +1,208 @@
-Este repositorio se trata de un **monorepo** que integra una aplicación frontend con Create React App y un backend con Express, facilitando el desarrollo y la gestión de ambos proyectos en un único entorno.
+# Sweet Medical 🏥 — Plataforma de gestión de turnos médicos
 
-## 📦 Estructura del Proyecto
+Aplicación web para reservar y administrar turnos médicos, con acceso por rol (**paciente** y **médico**). Los pacientes pueden buscar profesionales y especialidades, reservar turnos y ver sus turnos activos; los médicos gestionan su agenda, disponibilidad, servicios e historial de pacientes.
 
-El monorepo está organizado de la siguiente manera:
+🔗 **Demo online:** [sweet-medical-4.netlify.app](https://sweet-medical-4.netlify.app/)
+
+## Stack
+
+| Parte      | Tecnologías                                                                 |
+| ---------- | --------------------------------------------------------------------------- |
+| Frontend   | Next.js 16 (App Router), React 19, Ant Design, CSS propio                   |
+| Backend    | Node.js, Express 5, MongoDB + Mongoose, JWT, bcrypt, Zod, node-cron         |
+| Testing    | Jest + Supertest (backend), Cypress (end-to-end)                            |
+| Calidad    | ESLint, Prettier                                                            |
+
+## Estructura
 
 ```
 .
+├── cypress/                # Tests end-to-end
 ├── packages/
-│   ├── backend/        # Servidor Express.js
-│   └── frontend/       # Aplicación React (Create React App)
-├── package.json        # Configuración del monorepo (root)
-├── README.md           # Este archivo
-└── .env.example        # Ejemplo de configuración de variables de entorno
+│   ├── backend/            # API REST (Express + MongoDB)
+│   │   ├── index.js        # Punto de entrada: conecta a Mongo, inicia los cron jobs y el servidor
+│   │   └── src/
+│   │       ├── controllers/ services/ repositories/ models/ domain/
+│   │       ├── routes/     # Rutas de la API
+│   │       ├── jobs/       # Generación automática de turnos y recordatorios
+│   │       ├── docs/       # Especificación OpenAPI (swaggerSpec.json)
+│   │       └── tests/      # Tests unitarios y de integración
+│   └── frontend/           # App Next.js
+│       └── src/app/        # Páginas: login, registro, paciente/, medico/, turnos, ...
+├── cypress.config.js
+├── eslint.config.mjs
+└── package.json            # Herramientas compartidas (lint, prettier, cypress)
 ```
 
-## ⚙️ Paquetes
+---
 
-Este monorepo utiliza **`npm workspaces`** para gestionar los diferentes paquetes.
+## Requisitos
 
-### Backend (`packages/backend`)
+- **Node.js 20.9 o superior** (lo exige Next.js 16). Se recomienda Node 22 LTS.
+- **pnpm**: `npm install -g pnpm` (o `corepack enable`).
+- **MongoDB**: una instancia local, en Docker o en [MongoDB Atlas](https://www.mongodb.com/atlas) (tiene un plan gratuito).
 
-El backend está construido con Express.js y utiliza las siguientes dependencias:
+### Levantar MongoDB
 
-- **`express`**: El framework web para Node.js, utilizado para construir la API.
-- **`cors`**: Middleware para Express que habilita Cross-Origin Resource Sharing (CORS), necesario para permitir que el frontend acceda al backend desde un origen diferente.
-- **`dotenv`**: Carga variables de entorno desde un archivo `.env` en `process.env`. Es crucial para configurar el puerto del servidor y los orígenes permitidos.
-
-La idea es dar lo mínimo para levantar el servidor, y que durante el desarrollo del TP se vayan agregando las dependencias necesarias.
-
-### Frontend (`packages/frontend`)
-
-El frontend es una aplicación de React generada con Create React App.
-
-## 🚀 Inicio Rápido
-
-Seguí estos pasos para poner en marcha el proyecto:
-
-### 1\. Instalación de Dependencias
-
-Desde la raíz del monorepo, ejecutá:
+Elegí una opción:
 
 ```bash
-npm install
+# Opción 1: Docker
+docker run -d --name sweet-medical-mongo -p 27017:27017 mongo:7
+
+# Opción 2: instalación local
+# Descargar MongoDB Community Server desde https://www.mongodb.com/try/download/community
+# y dejar corriendo el servicio en el puerto 27017.
+
+# Opción 3: Atlas
+# Crear un cluster gratuito y copiar el connection string (mongodb+srv://...).
 ```
 
-Esto instalará todas las dependencias para la raíz y para los paquetes `frontend` y `backend`.
+---
 
-### 2\. Configuración de Variables de Entorno
+## Instalación
 
-Crea un archivo `.env` en el directorio `packages/backend`. Puedes usar el archivo `.env.example` como plantilla.
+Cada paquete se instala por separado:
 
+```bash
+# 1. Herramientas de la raíz (ESLint, Prettier, Cypress)
+pnpm install
+
+# 2. Backend
+cd packages/backend
+pnpm install
+
+# 3. Frontend
+cd ../frontend
+pnpm install
 ```
-# packages/backend/.env
-ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+## Variables de entorno
+
+### Backend — `packages/backend/.env`
+
+```env
+MONGO_URI=mongodb://localhost:27017/sweet-medical
 SERVER_PORT=3001
+JWT_SECRET=cambiame-por-un-secreto-largo
+FRONTEND_URL=http://localhost:3000
 ```
 
-- **`ALLOWED_ORIGINS`**: Define los orígenes permitidos para las solicitudes CORS. Asegurate de incluir la URL donde se ejecuta tu frontend (por defecto, `http://localhost:3000` para Create React App). Cuando se haga el despliegue en nube acá se deberá incluir la URL donde se desplegó el frontend.
-- **`SERVER_PORT`**: El puerto en el que se ejecutará el servidor backend (ej. `8000`).
+| Variable       | Descripción                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`    | Connection string de MongoDB (local o Atlas).                                                     |
+| `SERVER_PORT`  | Puerto del backend. El frontend espera `3001` por defecto.                                        |
+| `JWT_SECRET`   | Clave para firmar los tokens de login. **Obligatoria**: sin ella el login falla.                  |
+| `FRONTEND_URL` | Orígenes permitidos por CORS, separados por coma. Si no se define, se acepta cualquier origen.    |
 
-### 3\. Ejecución de la Aplicación
+### Frontend — `packages/frontend/.env.local` (opcional)
 
-Podés iniciar el frontend y el backend por separado o ambos a la vez:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
 
-#### Ejecutar el Backend
+Si no se define, el frontend usa `http://localhost:3001`.
+
+---
+
+## Ejecución
+
+Necesitás **dos terminales**.
+
+**Terminal 1 — Backend**
 
 ```bash
-npm run start:backend
+cd packages/backend
+pnpm dev        # con reinicio automático (node --watch)
+# o
+pnpm start      # sin watch
 ```
 
-Para el desarrollo con reinicio automático:
+Deberías ver:
+
+```
+¡Conectado a MongoDB con éxito!
+Backend escuchando en puerto 3001
+```
+
+Podés probar que responde en [http://localhost:3001/health](http://localhost:3001/health) → `{"status":"ok"}`.
+
+**Terminal 2 — Frontend**
 
 ```bash
-npm run dev:backend
+cd packages/frontend
+pnpm dev
 ```
 
-#### Ejecutar el Frontend
+Abrí [http://localhost:3000](http://localhost:3000). Para empezar, creá un usuario desde **Registro** y después iniciá sesión.
+
+### Build de producción del frontend
 
 ```bash
-npm run start:frontend
+cd packages/frontend
+pnpm build
+pnpm start
 ```
 
-#### Ejecutar Ambos (Desarrollo)
+---
 
-Para iniciar el backend en modo `dev` y el frontend simultáneamente, usá:
+## Tests
+
+### Unitarios e integración (backend)
 
 ```bash
-npm run start:dev
+cd packages/backend
+pnpm test
 ```
+
+### End-to-end (Cypress)
+
+Con el **backend y el frontend corriendo**, desde la raíz:
+
+```bash
+pnpm e2e              # modo headless
+npx cypress open      # modo interactivo
+```
+
+## Lint y formato
+
+Desde la raíz:
+
+```bash
+pnpm lint
+pnpm format
+```
+
+---
+
+## API
+
+Base URL: `http://localhost:3001`
+
+| Ruta               | Recurso                         |
+| ------------------ | ------------------------------- |
+| `/health`          | Healthcheck                     |
+| `/auth/login`      | Login (devuelve un JWT)         |
+| `/paciente`        | Alta de pacientes (registro), sus turnos |
+| `/medico`          | Alta de médicos (registro), agenda y disponibilidad |
+| `/turnos`          | Turnos                          |
+| `/especialidades`  | Especialidades                  |
+| `/sede`            | Sedes                           |
+| `/obraSocial`      | Obras sociales                  |
+| `/notificacion`    | Notificaciones                  |
+
+La especificación completa está en [`packages/backend/src/docs/swaggerSpec.json`](packages/backend/src/docs/swaggerSpec.json). Se puede abrir pegándola en [editor.swagger.io](https://editor.swagger.io/) o importándola en Postman.
+
+Al iniciar, el backend también arranca dos **cron jobs**: uno que genera turnos a partir de la disponibilidad de los médicos y otro que crea notificaciones de recordatorio de turnos.
+
+---
+
+## Problemas comunes
+
+| Problema                                        | Solución                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `MongooseServerSelectionError` / no conecta     | MongoDB no está corriendo o `MONGO_URI` es incorrecta. En Atlas, habilitá tu IP en *Network Access*. |
+| `secretOrPrivateKey must have a value` al login | Falta `JWT_SECRET` en `packages/backend/.env`.                                              |
+| Error de CORS en el navegador                   | Agregá la URL del frontend a `FRONTEND_URL`.                                                |
+| El frontend no trae datos                       | Verificá que el backend esté en el puerto `3001` o configurá `NEXT_PUBLIC_API_URL`.          |
+| `pnpm start:backend` desde la raíz no encuentra el paquete | Los scripts de la raíz usan `pnpm --filter`, pero el workspace de la raíz no declara `packages/*`. Corré cada paquete desde su carpeta como se indica arriba. |
